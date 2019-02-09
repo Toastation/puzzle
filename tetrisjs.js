@@ -70,6 +70,7 @@ function drawBlock() {
     let ox = block.x, oy = block.y;
     for (let x=0; x<shape.length; x++) {
         for (let y=0; y<shape.length; y++) {
+            if (oy+y < 0) continue;
             if (shape[y][x] === 1)
                 rect((ox+x)*BS, (oy+y)*BS, BS, BS);
         }
@@ -102,7 +103,7 @@ function spawnNextBlock() {
     block.type = random(TYPES);
     block.rot = 0;
     block.x = 5;
-    block.y = 0;
+    block.y = -3;
 }
 
 function land() {
@@ -120,10 +121,8 @@ function checkCollision(ox, oy, type, rot) {
     let shape = getShape(type, rot);
     for (let x=0; x<shape.length; x++) {
         for (let y=shape.length-1; y>=0; y--) {
-            if (shape[y][x] === 1) {
-                if (ox+x >= W || oy+y >= H || ox+x < 0 || board[ox+x][oy+y] === 1) return true;
-                //break;
-            }
+            if (shape[y][x] === 1 && (ox+x >= W || oy+y >= H || ox+x < 0 || board[ox+x][oy+y] === 1))
+                    return true;
         }
     }
     return false;
@@ -133,6 +132,7 @@ function fall() {
     let ny = block.y+1;
     if (checkCollision(block.x, ny, block.type, block.rot)) {
         land();
+        checkClear(block.y, block.y+4);
         spawnNextBlock();
     } else {
         block.y = ny;
@@ -152,6 +152,31 @@ function srsKickTest(clockwise, init, nrot) {
         }
     }
     return false;
+}
+
+function checkClear(y1, y2) {
+    let linesCleared = 0;
+    let notCleared = false;
+    for (let y=y1; y<y2; y++) {
+        for (let x=0; x<W; x++) {
+            if (board[x][y] === 0) {
+                notCleared = true;
+                break;
+            }
+        }
+        if (!notCleared) {
+            clearLine(y);
+            linesCleared += 1;
+        }
+        notCleared = false;
+    }
+    return linesCleared;
+}
+
+function clearLine(y) {
+    for (var x=0; x<W; x++) {
+        board[x][y] = 0;
+    }
 }
 
 function keyPressed() {
