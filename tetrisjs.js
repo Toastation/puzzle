@@ -65,7 +65,8 @@ function drawBlock() {
     translate((WIDTH-W2)/2, (HEIGHT-H2)/2);
     stroke(255, 255, 255, 25);
     strokeWeight(1);
-    fill(200, 0, 200);
+    let color = data[block.type].color;
+    fill(color[0], color[1], color[2]);
     let shape = getShape(block.type, block.rot);
     let ox = block.x, oy = block.y;
     for (let x=0; x<shape.length; x++) {
@@ -106,6 +107,14 @@ function spawnNextBlock() {
     block.y = -3;
 }
 
+function getHighestEmptyY(x, oy) {
+    for (let y = oy; y<H; y++) {
+        if (y+1 >= H || board[x][y+1] === 1)
+            return y;
+    }
+    return oy;
+}
+
 function land() {
     let shape = getShape(block.type, block.rot);
     for (let x = 0; x<shape.length; x++) {
@@ -139,6 +148,14 @@ function fall() {
     }
 }
 
+function quickFall() {
+    while(!checkCollision(block.x, block.y+1, block.type, block.rot))
+        block.y += 1;
+    land();
+    checkClear(block.y, block.y+4);
+    spawnNextBlock();
+}
+
 function srsKickTest(clockwise, init, nrot) {
     let rot = clockwise ? "cw" : "ccw";
     let kick = block.type === "I" ? "kickI" : "kick";
@@ -157,7 +174,7 @@ function srsKickTest(clockwise, init, nrot) {
 function checkClear(y1, y2) {
     let linesCleared = 0;
     let notCleared = false;
-    for (let y=y1; y<y2; y++) {
+    for (let y=0; y<H; y++) {
         for (let x=0; x<W; x++) {
             if (board[x][y] === 0) {
                 notCleared = true;
@@ -166,11 +183,22 @@ function checkClear(y1, y2) {
         }
         if (!notCleared) {
             clearLine(y);
+            blockFall(y);
             linesCleared += 1;
         }
         notCleared = false;
     }
+    if (linesCleared >= 1)
+        console.log(linesCleared);
     return linesCleared;
+}
+
+function blockFall(yMax) {
+    for (let y=yMax; y>0; y--) {
+        for (let x=0; x<W; x++) {
+            board[x][y] = board[x][y-1];
+        }
+    }
 }
 
 function clearLine(y) {
@@ -190,6 +218,9 @@ function keyPressed() {
                 break;
             case DOWN_ARROW:
                 fall();
+                break;
+            case UP_ARROW:
+                quickFall();
                 break;
         } 
     }
@@ -233,7 +264,7 @@ function setup() {
 }
 
 function draw() {
-    // if (!pause) update();
+    // if (!pause) update()
     translate(-(WIDTH/2),-(HEIGHT/2));
     scale(2);
     background(0);
