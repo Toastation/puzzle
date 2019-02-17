@@ -4,20 +4,20 @@ const H = 20;
 const BS = 10;
 const W2 = W*BS;
 const H2 = H*BS;
+const INPUTDELAY = 100;
 const TYPES = ["T", "O", "I", "S", "Z", "J", "L"];
 
 let data;
-
+let board;
+let fallInterval;
+let pause = false;
+let lastInput;
 let block = {
     x : 0,
     y : 0,
     type : "T",
     rot : 0
 };
-
-let board;
-let fallInterval;
-let pause = false;
 
 function initBoard() {
     board = new Array(W);
@@ -46,15 +46,17 @@ function drawBoard() {
     for (let x=0; x<W; x++) {
         push();
         noStroke();
-        x % 2 == 0 ? fill(255, 253, 208) : fill(210, 180, 140);
-        rect(x*BS, 0, BS+1, H2+1);
+        //x % 2 == 0 ? fill(255, 253, 208) : fill(210, 180, 140);
+        //rect(x*BS, 0, BS+1, H2+1);
         pop();
         for (let y=0; y<H; y++) {
             noFill();
-            rect(x*BS, y*BS, BS, BS);
-            fill(200, 0, 0);
-            if (board[x][y] === 1)
+            //rect(x*BS, y*BS, BS, BS);
+            if (board[x][y] >= 1) {
+                let color = data.colors[board[x][y]-1];
+                fill(color[0], color[1], color[2]);
                 rect(x*BS, y*BS, BS, BS);
+            }
         }    
     }
     pop();
@@ -65,15 +67,18 @@ function drawBlock() {
     translate((WIDTH-W2)/2, (HEIGHT-H2)/2);
     stroke(255, 255, 255, 25);
     strokeWeight(1);
-    let color = data[block.type].color;
-    fill(color[0], color[1], color[2]);
+    let color = data.colors[data[block.type].color-1];
     let shape = getShape(block.type, block.rot);
     let ox = block.x, oy = block.y;
+    let reflectY = getGroundY();
     for (let x=0; x<shape.length; x++) {
         for (let y=0; y<shape.length; y++) {
-            if (oy+y < 0) continue;
-            if (shape[y][x] === 1)
+            if (shape[y][x] >= 1) {
+                fill(color[0], color[1], color[2]);
                 rect((ox+x)*BS, (oy+y)*BS, BS, BS);
+                fill(color[0], color[1], color[2], 30);
+                rect((ox+x)*BS, (reflectY+y)*BS, BS, BS);
+            }
         }
     }
     pop();
@@ -107,20 +112,12 @@ function spawnNextBlock() {
     block.y = -3;
 }
 
-function getHighestEmptyY(x, oy) {
-    for (let y = oy; y<H; y++) {
-        if (y+1 >= H || board[x][y+1] === 1)
-            return y;
-    }
-    return oy;
-}
-
 function land() {
     let shape = getShape(block.type, block.rot);
     for (let x = 0; x<shape.length; x++) {
         for (let y = 0; y<shape.length; y++) {
-            if (shape[y][x] === 1)
-                board[x+block.x][y+block.y] = shape[y][x];
+            if (shape[y][x] >= 1)
+                board[x+block.x][y+block.y] = shape[y][x]*data[block.type].color;
         }
     }
     return true;
@@ -130,11 +127,17 @@ function checkCollision(ox, oy, type, rot) {
     let shape = getShape(type, rot);
     for (let x=0; x<shape.length; x++) {
         for (let y=shape.length-1; y>=0; y--) {
-            if (shape[y][x] === 1 && (ox+x >= W || oy+y >= H || ox+x < 0 || board[ox+x][oy+y] === 1))
+            if (shape[y][x] >= 1 && (ox+x >= W || oy+y >= H || ox+x < 0 || board[ox+x][oy+y] >= 1))
                     return true;
         }
     }
     return false;
+}
+
+function getGroundY() {
+    let y = block.y;
+    while(!checkCollision(block.x, y+1, block.type, block.rot)) y += 1;
+    return y;
 }
 
 function fall() {
@@ -149,8 +152,7 @@ function fall() {
 }
 
 function quickFall() {
-    while(!checkCollision(block.x, block.y+1, block.type, block.rot))
-        block.y += 1;
+    while(!checkCollision(block.x, block.y+1, block.type, block.rot)) block.y += 1;
     land();
     checkClear(block.y, block.y+4);
     spawnNextBlock();
@@ -171,7 +173,7 @@ function srsKickTest(clockwise, init, nrot) {
     return false;
 }
 
-function checkClear(y1, y2) {
+function checkClear() {
     let linesCleared = 0;
     let notCleared = false;
     for (let y=0; y<H; y++) {
@@ -208,21 +210,8 @@ function clearLine(y) {
 }
 
 function keyPressed() {
-    if (!pause) {
-        switch (keyCode) {
-            case LEFT_ARROW:
-                if (!checkCollision(block.x-1, block.y, block.type, block.rot)) block.x -= 1;
-                break;
-            case RIGHT_ARROW:
-                if (!checkCollision(block.x+1, block.y, block.type, block.rot)) block.x += 1;
-                break;
-            case DOWN_ARROW:
-                fall();
-                break;
-            case UP_ARROW:
-                quickFall();
-                break;
-        } 
+    if (!pause && keyCode == UP_ARROW) {
+        quickFall();
     }
     switch (key) {
         case "P":
@@ -233,20 +222,34 @@ function keyPressed() {
                 fallInterval = setInterval(fall, 500);
             }
             break;
-        case "W":
+        case "X":
             let tmp = block.rot-1;
             if (tmp < 0) tmp = data[block.type].blocks.length-1;
             srsKickTest(false, block.rot, tmp);
             break;
-        case "X":
+        case "W":
             srsKickTest(true, block.rot, (block.rot+1)%4);
             break;
     }
 }
 
 function update() {
-    if (keyIsDown(DOWN_ARROW))
+    let t = millis();
+    if (t - lastInput < INPUTDELAY) return;
+    if (keyIsDown(RIGHT_ARROW)) {
+        if (!checkCollision(block.x+1, block.y, block.type, block.rot)) {
+            block.x += 1;
+            lastInput = t;
+        }
+    } else if (keyIsDown(LEFT_ARROW)) {
+        if (!checkCollision(block.x-1, block.y, block.type, block.rot)) {
+            block.x -= 1;
+            lastInput = t;
+        }
+    } else if (keyIsDown(DOWN_ARROW)) {
         fall();
+        lastInput = t;
+    }
 }
 
 function preload() {
@@ -264,7 +267,7 @@ function setup() {
 }
 
 function draw() {
-    // if (!pause) update()
+    if (!pause) update();
     translate(-(WIDTH/2),-(HEIGHT/2));
     scale(2);
     background(0);
