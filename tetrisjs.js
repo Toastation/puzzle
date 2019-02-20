@@ -1,15 +1,20 @@
-const WIDTH = 1024, HEIGHT = 800;
-const W = 10;
-const H = 20;
-const BS = 10;
-const W2 = W*BS;
-const H2 = H*BS;
-const INPUTDELAY = 100;
+const WIDTH = 1024, HEIGHT = 800; // width and height of the screen
+const W = 10; // width of the board
+const H = 20; // height of the visible part of the board
+const RH = 40; // real height of the board
+const SH = 17; // spawn height
+const BH = RH-H; // buffer height
+const BS = 10; // block size in pixel
+const W2 = W*BS; // width of the board in pixel 
+const H2 = H*BS; // height of the board in pixel
+const INPUTDELAY = 100; // delay between inputs when a key is held
 const TYPES = ["T", "O", "I", "S", "Z", "J", "L"];
 
 let data;
 let board;
 let fallInterval;
+let queue = [], queueBuffer = [];
+let hold = "";
 let pause = false;
 let lastInput;
 let block = {
@@ -19,11 +24,19 @@ let block = {
     rot : 0
 };
 
+function getShape(type, rot) {
+    return data[type].blocks[rot];
+}
+
+/**
+ * INIT
+ */
+
 function initBoard() {
     board = new Array(W);
     for (let w=0; w<W; w++) {
         board[w] = new Array(H);
-        for (let h=0; h<H; h++) {
+        for (let h=0; h<RH; h++) {
             board[w][h]=0;
         }
     }
@@ -31,12 +44,31 @@ function initBoard() {
 
 function initGame() {
     initBoard();
+    initQueue();
     spawnNextBlock();
 }
 
-function getShape(type, rot) {
-    return data[type].blocks[rot];
+function initQueue() {
+    queue = ["T", "O", "I", "S", "Z", "J", "L"];
+    shuffle(queue, true);
 }
+
+function spawnNextBlock() {
+    if (queueBuffer.length == 0) {
+        queueBuffer = ["T", "O", "I", "S", "Z", "J", "L"];
+        shuffle(queueBuffer, true);
+    }
+    let nextType = queue.shift();
+    queue.push(queueBuffer.pop());
+    block.x = 5;
+    block.y = 18;
+    block.type = nextType;
+    block.rot = 0;
+}
+
+/**
+ *  RENDERING
+ */
 
 function drawBoard() {
     push();
@@ -52,8 +84,8 @@ function drawBoard() {
         for (let y=0; y<H; y++) {
             noFill();
             //rect(x*BS, y*BS, BS, BS);
-            if (board[x][y] >= 1) {
-                let color = data.colors[board[x][y]-1];
+            if (board[x][y+BH] >= 1) {
+                let color = data.colors[board[x][y+BH]-1];
                 fill(color[0], color[1], color[2]);
                 rect(x*BS, y*BS, BS, BS);
             }
@@ -69,15 +101,15 @@ function drawBlock() {
     strokeWeight(1);
     let color = data.colors[data[block.type].color-1];
     let shape = getShape(block.type, block.rot);
-    let ox = block.x, oy = block.y;
-    let reflectY = getGroundY();
+    let ox = block.x, oy = block.y-20;
+    let ghostY = getGroundY()-20;
     for (let x=0; x<shape.length; x++) {
         for (let y=0; y<shape.length; y++) {
             if (shape[y][x] >= 1) {
                 fill(color[0], color[1], color[2]);
                 rect((ox+x)*BS, (oy+y)*BS, BS, BS);
                 fill(color[0], color[1], color[2], 30);
-                rect((ox+x)*BS, (reflectY+y)*BS, BS, BS);
+                rect((ox+x)*BS, (ghostY+y)*BS, BS, BS);
             }
         }
     }
@@ -101,16 +133,26 @@ function drawPause() {
     textAlign(CENTER, CENTER);
     textSize(32);
     textFont();
-    text("Paused", WIDTH/2, HEIGHT/2);
+    text("Paused", WIDTH/2, HEIGHT/2-H2/1.5);
     pop();
 }
 
-function spawnNextBlock() {
-    block.type = random(TYPES);
-    block.rot = 0;
-    block.x = 5;
-    block.y = -3;
+function drawDebug() {
+    push();
+    fill(255, 255, 255);
+    strokeWeight(2);
+    stroke(0, 0, 0);
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    textFont();
+    text("block.y = "+block.y, WIDTH/2-200, HEIGHT/2);
+    text("hold = "+hold, 400, 400);
+    pop();
 }
+
+/**
+ * GAME LOGIC
+ */
 
 function land() {
     let shape = getShape(block.type, block.rot);
@@ -127,7 +169,7 @@ function checkCollision(ox, oy, type, rot) {
     let shape = getShape(type, rot);
     for (let x=0; x<shape.length; x++) {
         for (let y=shape.length-1; y>=0; y--) {
-            if (shape[y][x] >= 1 && (ox+x >= W || oy+y >= H || ox+x < 0 || board[ox+x][oy+y] >= 1))
+            if (shape[y][x] >= 1 && (ox+x >= W || oy+y >= RH || ox+x < 0 || board[ox+x][oy+y] >= 1))
                     return true;
         }
     }
@@ -178,14 +220,14 @@ function checkClear() {
     let notCleared = false;
     for (let y=0; y<H; y++) {
         for (let x=0; x<W; x++) {
-            if (board[x][y] === 0) {
+            if (board[x][y+BH] === 0) {
                 notCleared = true;
                 break;
             }
         }
         if (!notCleared) {
-            clearLine(y);
-            blockFall(y);
+            clearLine(y+BH);
+            blockFall(y+BH);
             linesCleared += 1;
         }
         notCleared = false;
@@ -222,13 +264,28 @@ function keyPressed() {
                 fallInterval = setInterval(fall, 500);
             }
             break;
-        case "X":
+        case "W":
             let tmp = block.rot-1;
             if (tmp < 0) tmp = data[block.type].blocks.length-1;
             srsKickTest(false, block.rot, tmp);
             break;
-        case "W":
+        case "X":
             srsKickTest(true, block.rot, (block.rot+1)%4);
+            break;
+        case "R":
+            initGame();
+            clearInterval(fallInterval);
+            fallInterval = setInterval(fall, 500);
+            break;
+        case "C":
+            let buf = block.type;
+            if (hold === "") {
+                spawnNextBlock();
+                hold = buf;
+            } else {
+                block.type = hold;
+                hold = buf;
+            }
             break;
     }
 }
@@ -251,6 +308,10 @@ function update() {
         lastInput = t;
     }
 }
+
+/**
+ * PROCESSING
+ */
 
 function preload() {
     data = loadJSON("data.json", ()=>{
@@ -275,4 +336,5 @@ function draw() {
     drawBoard();
     drawBlock();
     if (pause) drawPause();
+    drawDebug();
 }
