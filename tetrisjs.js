@@ -7,7 +7,9 @@ const BH = RH-H; // buffer height
 const BS = 10; // block size in pixel
 const W2 = W*BS; // width of the board in pixel 
 const H2 = H*BS; // height of the board in pixel
-const INPUTDELAY = 100; // delay between inputs when a key is held
+const DASDELAY = 200; // delay after the first input is held, in ms
+const INPUTDELAY = 25; // delay between inputs when a key is held, in ms
+const LOCKDELAY = 500; // delay between a block and landing and the block locking, in ms
 const TYPES = ["T", "O", "I", "S", "Z", "J", "L"];
 
 let data;
@@ -15,8 +17,11 @@ let board;
 let fallInterval;
 let queue = [], queueBuffer = [];
 let hold = "";
+let lastInput = -1;
+let inputHeldCount = 0;
 let pause = false;
-let lastInput;
+let landed = false;
+let landedTime = -1;
 let block = {
     x : 0,
     y : 0,
@@ -146,7 +151,9 @@ function drawDebug() {
     textSize(12);
     textFont();
     text("block.y = "+block.y, WIDTH/2-200, HEIGHT/2);
-    text("hold = "+hold, 400, 400);
+    text("hold = "+hold, 370, 400);
+    text("inputHeldCount = "+inputHeldCount, 330, 450);
+
     pop();
 }
 
@@ -290,22 +297,32 @@ function keyPressed() {
     }
 }
 
+function keyReleased() {
+    if (!pause)
+        inputHeldCount = 0;
+}
+
 function update() {
     let t = millis();
-    if (t - lastInput < INPUTDELAY) return;
+    let inputDelay = (inputHeldCount === 1) ? DASDELAY : INPUTDELAY;
+    if (lastInput > 0 && t - lastInput < inputDelay) return;
     if (keyIsDown(RIGHT_ARROW)) {
         if (!checkCollision(block.x+1, block.y, block.type, block.rot)) {
             block.x += 1;
             lastInput = t;
+            inputHeldCount++;
         }
     } else if (keyIsDown(LEFT_ARROW)) {
         if (!checkCollision(block.x-1, block.y, block.type, block.rot)) {
             block.x -= 1;
             lastInput = t;
+            inputHeldCount++;
         }
     } else if (keyIsDown(DOWN_ARROW)) {
         fall();
         lastInput = t;
+    } else {
+        inputHeldCount = 0;
     }
 }
 
