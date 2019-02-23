@@ -9,7 +9,9 @@ const W2 = W*BS; // width of the board in pixel
 const H2 = H*BS; // height of the board in pixel
 const DASDELAY = 200; // delay after the first input is held, in ms
 const INPUTDELAY = 25; // delay between inputs when a key is held, in ms
-const LOCKDELAY = 500; // delay between a block and landing and the block locking, in ms
+const GRAVITY = 500; // delay between the line falling, in ms
+const LOCKDELAY = 1000; // delay between the block landing and locking in place, in ms
+const MAXRESET = 10; // max number of lock delay reset with rotation/translation
 const TYPES = ["T", "O", "I", "S", "Z", "J", "L"];
 
 let data;
@@ -17,11 +19,13 @@ let board;
 let fallInterval;
 let queue = [], queueBuffer = [];
 let hold = "";
+let lastFall = -1;
 let lastInput = -1;
 let inputHeldCount = 0;
+let landedTime = -1;
+let resetCount = 0;
 let pause = false;
 let landed = false;
-let landedTime = -1;
 let block = {
     x : 0,
     y : 0,
@@ -51,6 +55,16 @@ function initGame() {
     initBoard();
     initQueue();
     spawnNextBlock();
+    // queue = [];
+    // queueBuffer = [];
+    // hold = "";
+    // lastFall = -1;
+    // lastInput = -1;
+    // inputHeldCount = 0;
+    // landedTime = -1;
+    // resetCount = 0;
+    // pause = false;
+    // landed = false;
 }
 
 function initQueue() {
@@ -151,9 +165,9 @@ function drawDebug() {
     textSize(12);
     textFont();
     text("block.y = "+block.y, WIDTH/2-200, HEIGHT/2);
-    text("hold = "+hold, 370, 400);
-    text("inputHeldCount = "+inputHeldCount, 330, 450);
-
+    text("hold = "+hold, 380, 400);
+    text("resetCount = "+resetCount, 330, 450);
+    text("landed = "+landed, 330, 500);
     pop();
 }
 
@@ -161,7 +175,7 @@ function drawDebug() {
  * GAME LOGIC
  */
 
-function land() {
+function lock() {
     let shape = getShape(block.type, block.rot);
     for (let x = 0; x<shape.length; x++) {
         for (let y = 0; y<shape.length; y++) {
@@ -170,6 +184,14 @@ function land() {
         }
     }
     return true;
+}
+
+function lockAndCheck() {
+    lock();
+    checkClear(block.y, block.y+4);
+    spawnNextBlock();
+    resetCount = 0;
+    landed = false;
 }
 
 function checkCollision(ox, oy, type, rot) {
@@ -191,20 +213,16 @@ function getGroundY() {
 
 function fall() {
     let ny = block.y+1;
-    if (checkCollision(block.x, ny, block.type, block.rot)) {
-        land();
-        checkClear(block.y, block.y+4);
-        spawnNextBlock();
-    } else {
+    if (!checkCollision(block.x, ny, block.type, block.rot)) {
         block.y = ny;
+        landed = checkCollision(block.x, block.y+1, block.type, block.rot);
+        if (landed) landedTime = millis();
     }
 }
 
-function quickFall() {
+function hardDrop() {
     while(!checkCollision(block.x, block.y+1, block.type, block.rot)) block.y += 1;
-    land();
-    checkClear(block.y, block.y+4);
-    spawnNextBlock();
+    lockAndCheck();
 }
 
 function srsKickTest(clockwise, init, nrot) {
@@ -216,6 +234,7 @@ function srsKickTest(clockwise, init, nrot) {
             block.x += tests[i][0];
             block.y += tests[i][1];
             block.rot = nrot;
+            landed = checkCollision(block.x, block.y+1, block.type, block.rot);
             return true;
         }
     }
@@ -258,31 +277,35 @@ function clearLine(y) {
     }
 }
 
+function resetLockDelay() {
+    if (landed) {
+        if (resetCount == MAXRESET)
+            lockAndCheck();
+        resetCount++;
+        landedTime = millis();
+    }
+}
+
 function keyPressed() {
     if (!pause && keyCode == UP_ARROW) {
-        quickFall();
+        hardDrop();
     }
     switch (key) {
         case "P":
             pause = !pause;
-            if (pause) {
-                clearInterval(fallInterval);
-            } else {
-                fallInterval = setInterval(fall, 500);
-            }
             break;
         case "W":
             let tmp = block.rot-1;
             if (tmp < 0) tmp = data[block.type].blocks.length-1;
             srsKickTest(false, block.rot, tmp);
+            resetLockDelay();
             break;
         case "X":
             srsKickTest(true, block.rot, (block.rot+1)%4);
+            resetLockDelay();
             break;
         case "R":
             initGame();
-            clearInterval(fallInterval);
-            fallInterval = setInterval(fall, 500);
             break;
         case "C":
             let buf = block.type;
@@ -302,7 +325,7 @@ function keyReleased() {
         inputHeldCount = 0;
 }
 
-function update() {
+function input() {
     let t = millis();
     let inputDelay = (inputHeldCount === 1) ? DASDELAY : INPUTDELAY;
     if (lastInput > 0 && t - lastInput < inputDelay) return;
@@ -311,18 +334,33 @@ function update() {
             block.x += 1;
             lastInput = t;
             inputHeldCount++;
+            resetLockDelay();
         }
     } else if (keyIsDown(LEFT_ARROW)) {
         if (!checkCollision(block.x-1, block.y, block.type, block.rot)) {
             block.x -= 1;
             lastInput = t;
             inputHeldCount++;
+            resetLockDelay();
         }
     } else if (keyIsDown(DOWN_ARROW)) {
         fall();
         lastInput = t;
     } else {
         inputHeldCount = 0;
+    }
+}
+
+function update() {
+    input();
+
+    let t = millis();
+    if (landed && t - landedTime > LOCKDELAY)
+        lockAndCheck();
+    
+    if (t - lastFall > GRAVITY && !landed) { 
+        fall();
+        lastFall = t;
     }
 }
 
@@ -341,7 +379,7 @@ function preload() {
 function setup() {
     createCanvas(WIDTH,HEIGHT);
     initGame();
-    fallInterval = setInterval(fall, 500);
+    lastFall = millis();
 }
 
 function draw() {
