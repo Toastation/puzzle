@@ -1,4 +1,4 @@
-const WIDTH = 1024, HEIGHT = 800; // width and height of the screen
+const WIDTH = 900, HEIGHT = 600; // width and height of the screen
 const W = 10; // width of the board
 const H = 20; // height of the visible part of the board
 const RH = 40; // real height of the board
@@ -19,13 +19,18 @@ let board;
 let fallInterval;
 let queue = [], queueBuffer = [];
 let hold = "";
+
 let lastFall = -1;
 let lastInput = -1;
 let inputHeldCount = 0;
 let landedTime = -1;
 let resetCount = 0;
+
+let gameOver = false;
 let pause = false;
 let landed = false;
+let canSwap = true;
+
 let block = {
     x : 0,
     y : 0,
@@ -52,19 +57,20 @@ function initBoard() {
 }
 
 function initGame() {
+    queue = [];
+    queueBuffer = [];
+    hold = "";
+    lastFall = -1;
+    lastInput = -1;
+    landedTime = -1;
+    inputHeldCount = 0;
+    resetCount = 0;
+    gameOver = false;
+    landed = false;
+    canSwap = true;
     initBoard();
     initQueue();
     spawnNextBlock();
-    // queue = [];
-    // queueBuffer = [];
-    // hold = "";
-    // lastFall = -1;
-    // lastInput = -1;
-    // inputHeldCount = 0;
-    // landedTime = -1;
-    // resetCount = 0;
-    // pause = false;
-    // landed = false;
 }
 
 function initQueue() {
@@ -79,8 +85,8 @@ function spawnNextBlock() {
     }
     let nextType = queue.shift();
     queue.push(queueBuffer.pop());
-    block.x = 5;
-    block.y = 18;
+    block.x = 3;
+    block.y = SH;
     block.type = nextType;
     block.rot = 0;
 }
@@ -93,7 +99,7 @@ function drawBoard() {
     push();
     translate((WIDTH-W2)/2, (HEIGHT-H2)/2);
     stroke(255, 255, 255, 25);
-    strokeWeight(1);
+    noStroke();
     for (let x=0; x<W; x++) {
         push();
         noStroke();
@@ -117,7 +123,8 @@ function drawBlock() {
     push();
     translate((WIDTH-W2)/2, (HEIGHT-H2)/2);
     stroke(255, 255, 255, 25);
-    strokeWeight(1);
+    noStroke();
+    //strokeWeight(1);
     let color = data.colors[data[block.type].color-1];
     let shape = getShape(block.type, block.rot);
     let ox = block.x, oy = block.y-20;
@@ -156,6 +163,18 @@ function drawPause() {
     pop();
 }
 
+function drawGameOver() {
+    push();
+    fill(255, 255, 255);
+    strokeWeight(2);
+    stroke(0, 0, 0);
+    textAlign(CENTER, CENTER);
+    textSize(32);
+    textFont();
+    text("Game Over!", WIDTH/2, HEIGHT/2-H2/1.5);
+    pop();
+}
+
 function drawDebug() {
     push();
     fill(255, 255, 255);
@@ -164,10 +183,8 @@ function drawDebug() {
     textAlign(CENTER, CENTER);
     textSize(12);
     textFont();
-    text("block.y = "+block.y, WIDTH/2-200, HEIGHT/2);
-    text("hold = "+hold, 380, 400);
-    text("resetCount = "+resetCount, 330, 450);
-    text("landed = "+landed, 330, 500);
+    text("hold = "+hold, 330, 400);
+    text("resetCount = "+resetCount, 330, 425);
     pop();
 }
 
@@ -192,6 +209,7 @@ function lockAndCheck() {
     spawnNextBlock();
     resetCount = 0;
     landed = false;
+    canSwap = true;
 }
 
 function checkCollision(ox, oy, type, rot) {
@@ -217,6 +235,8 @@ function fall() {
         block.y = ny;
         landed = checkCollision(block.x, block.y+1, block.type, block.rot);
         if (landed) landedTime = millis();
+    } else {
+        if (block.y == SH) gameOver = true;
     }
 }
 
@@ -253,7 +273,7 @@ function checkClear() {
         }
         if (!notCleared) {
             clearLine(y+BH);
-            blockFall(y+BH);
+            basicGravity(y+BH);
             linesCleared += 1;
         }
         notCleared = false;
@@ -263,7 +283,7 @@ function checkClear() {
     return linesCleared;
 }
 
-function blockFall(yMax) {
+function basicGravity(yMax) {
     for (let y=yMax; y>0; y--) {
         for (let x=0; x<W; x++) {
             board[x][y] = board[x][y-1];
@@ -286,8 +306,21 @@ function resetLockDelay() {
     }
 }
 
+function swap() {
+    if (!canSwap) return;
+    let buf = block.type;
+    if (hold === "") {
+        spawnNextBlock();
+        hold = buf;
+    } else {
+        block.type = hold;
+        hold = buf;
+    }
+    canSwap = false;
+}
+
 function keyPressed() {
-    if (!pause && keyCode == UP_ARROW) {
+    if (!pause && !gameOver && keyCode == UP_ARROW) {
         hardDrop();
     }
     switch (key) {
@@ -308,20 +341,14 @@ function keyPressed() {
             initGame();
             break;
         case "C":
-            let buf = block.type;
-            if (hold === "") {
-                spawnNextBlock();
-                hold = buf;
-            } else {
-                block.type = hold;
-                hold = buf;
-            }
+            swap();
             break;
     }
+    if (keyCode == DOWN_ARROW) return false;
 }
 
 function keyReleased() {
-    if (!pause)
+    if (!pause && !gameOver)
         inputHeldCount = 0;
 }
 
@@ -377,13 +404,14 @@ function preload() {
 }
 
 function setup() {
-    createCanvas(WIDTH,HEIGHT);
+    let canvas = createCanvas(WIDTH, HEIGHT);
+    canvas.parent("sketch");
     initGame();
     lastFall = millis();
 }
 
 function draw() {
-    if (!pause) update();
+    if (!pause && !gameOver) update();
     translate(-(WIDTH/2),-(HEIGHT/2));
     scale(2);
     background(0);
@@ -391,5 +419,6 @@ function draw() {
     drawBoard();
     drawBlock();
     if (pause) drawPause();
+    if (gameOver) drawGameOver();
     drawDebug();
 }
