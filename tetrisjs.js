@@ -25,6 +25,7 @@ let lastInput = -1;
 let inputHeldCount = 0;
 let landedTime = -1;
 let resetCount = 0;
+let score = 0;
 
 let gameOver = false;
 let pause = false;
@@ -103,12 +104,12 @@ function drawBoard() {
     for (let x=0; x<W; x++) {
         push();
         noStroke();
-        //x % 2 == 0 ? fill(255, 253, 208) : fill(210, 180, 140);
-        //rect(x*BS, 0, BS+1, H2+1);
+        x % 2 == 0 ? fill(0, 0, 0, 0) : fill(40, 40, 40, 75);
+        rect(x*BS, 0, BS, H2);
         pop();
         for (let y=0; y<H; y++) {
             noFill();
-            //rect(x*BS, y*BS, BS, BS);
+            rect(x*BS, y*BS, BS, BS);
             if (board[x][y+BH] >= 1) {
                 let color = data.colors[board[x][y+BH]-1];
                 fill(color[0], color[1], color[2]);
@@ -124,7 +125,6 @@ function drawBlock() {
     translate((WIDTH-W2)/2, (HEIGHT-H2)/2);
     stroke(255, 255, 255, 25);
     noStroke();
-    //strokeWeight(1);
     let color = data.colors[data[block.type].color-1];
     let shape = getShape(block.type, block.rot);
     let ox = block.x, oy = block.y-20;
@@ -133,7 +133,7 @@ function drawBlock() {
         for (let y=0; y<shape.length; y++) {
             if (shape[y][x] >= 1) {
                 fill(color[0], color[1], color[2]);
-                rect((ox+x)*BS, (oy+y)*BS, BS, BS);
+                if (oy+y>=0) rect((ox+x)*BS, (oy+y)*BS, BS, BS);
                 fill(color[0], color[1], color[2], 30);
                 rect((ox+x)*BS, (ghostY+y)*BS, BS, BS);
             }
@@ -147,7 +147,7 @@ function drawBorders() {
     noFill();
     stroke(255,255,255);
     strokeJoin(BEVEL);
-    rect((WIDTH-W2)/2-1, (HEIGHT-H2)/2-1, W2+2, H2+2);
+    rect((WIDTH-W2)/2-1, (HEIGHT-H2)/2-1, W2+1, H2+1);
     pop();
 }
 
@@ -185,6 +185,13 @@ function drawDebug() {
     textFont();
     text("hold = "+hold, 330, 400);
     text("resetCount = "+resetCount, 330, 425);
+    pop();
+}
+
+function drawScore() {
+    push();
+    fill(255);
+    strokeWeight(2);
     pop();
 }
 
@@ -324,23 +331,23 @@ function keyPressed() {
         hardDrop();
     }
     switch (key) {
-        case "P":
+        case "p":
             pause = !pause;
             break;
-        case "W":
+        case "w":
             let tmp = block.rot-1;
             if (tmp < 0) tmp = data[block.type].blocks.length-1;
             srsKickTest(false, block.rot, tmp);
             resetLockDelay();
             break;
-        case "X":
+        case "x":
             srsKickTest(true, block.rot, (block.rot+1)%4);
             resetLockDelay();
             break;
-        case "R":
+        case "r":
             initGame();
             break;
-        case "C":
+        case "c":
             swap();
             break;
     }
