@@ -30,6 +30,7 @@ let score = 0;
 
 let gameOver = false;
 let pause = false;
+let debug = true;
 let landed = false;
 let canSwap = true;
 
@@ -97,17 +98,12 @@ function spawnNextBlock() {
  *  RENDERING
  */
 
-function drawBorders() {
+function drawBoard() {
     push();
     noFill();
     stroke(255,255,255);
     strokeJoin(BEVEL);
     rect(0, 0, W2+1, H2+1);
-    pop();
-}
-function drawBoard() {
-    push();
-    stroke(255, 255, 255, 25);
     noStroke();
     translate(1, 1); // border
     for (let x=0; x<W; x++) {
@@ -143,7 +139,7 @@ function drawBlock() {
                 fill(color[0], color[1], color[2]);
                 if (oy+y>=0) rect((ox+x)*BS, (oy+y)*BS, BS, BS);
                 fill(color[0], color[1], color[2], 30);
-                rect((ox+x)*BS, (ghostY+y)*BS, BS, BS);
+                if (ghostY+y>=0) rect((ox+x)*BS, (ghostY+y)*BS, BS, BS);
             }
         }
     }
@@ -155,10 +151,10 @@ function drawPause() {
     fill(255, 255, 255);
     strokeWeight(2);
     stroke(0, 0, 0);
+    translate(WIDTH / (2 * SCALE), HEIGHT / (2 * SCALE));
     textAlign(CENTER, CENTER);
     textSize(32);
-    textFont();
-    text("Paused", WIDTH/2, HEIGHT/2-H2/1.5);
+    text("Paused", 0, 0);
     pop();
 }
 
@@ -167,10 +163,10 @@ function drawGameOver() {
     fill(255, 255, 255);
     strokeWeight(2);
     stroke(0, 0, 0);
+    translate(WIDTH / (2 * SCALE), HEIGHT / (2 * SCALE));
     textAlign(CENTER, CENTER);
     textSize(32);
-    textFont();
-    text("Game Over!", WIDTH/2, HEIGHT/2-H2/1.5);
+    text("Game Over!", 0, -(H2/2) - 32);
     pop();
 }
 
@@ -185,21 +181,18 @@ function drawNext() {
     push();
     stroke(255);
     strokeWeight(1);
-    fill(55);
-    rect(0, 0, 10, 10);
     pop();
 }
 
 function drawDebug() {
-    push();
+    push(); 
     fill(255, 255, 255);
     strokeWeight(2);
     stroke(0, 0, 0);
-    textAlign(CENTER, CENTER);
-    textSize(12);
-    textFont();
-    text("hold = "+hold, 330, 400);
-    text("resetCount = "+resetCount, 330, 425);
+    textSize(10);
+    text("hold = "+hold, 5, 50);
+    text("resetCount = "+resetCount, 5, 65);
+    text("landed = "+landed, 5, 80);
     pop();
 }
 
@@ -223,6 +216,7 @@ function lockAndCheck() {
     checkClear(block.y, block.y+4);
     spawnNextBlock();
     resetCount = 0;
+    console.log("yoyoy");
     landed = false;
     canSwap = true;
 }
@@ -252,6 +246,8 @@ function fall() {
         if (landed) landedTime = millis();
     } else {
         if (block.y == SH) gameOver = true;
+        landed = true;
+        landedTime = millis();
     }
 }
 
@@ -314,10 +310,10 @@ function clearLine(y) {
 
 function resetLockDelay() {
     if (landed) {
-        if (resetCount == MAXRESET)
-            lockAndCheck();
-        resetCount++;
-        landedTime = millis();
+        if (resetCount < MAXRESET) {
+            resetCount++;
+            landedTime = millis();
+        }
     }
 }
 
@@ -357,6 +353,9 @@ function keyPressed() {
             break;
         case "c": case "C":
             swap();
+            break;
+        case "d": case "D":
+            debug = !debug;
             break;
     }
     if (keyCode == DOWN_ARROW) return false;
@@ -426,17 +425,17 @@ function setup() {
 }
 
 function draw() {
+    if (!focused) pause = true;
     if (!pause && !gameOver) update();
     scale(SCALE);
     background(0);
     push();
     translate((WIDTH/2 - W2*SCALE/2) / SCALE, (HEIGHT/2 - H2*SCALE/2) / SCALE);
-    drawBorders();
     drawBoard();
     drawBlock();
     pop();
     drawNext();
     if (pause) drawPause();
     if (gameOver) drawGameOver();
-    drawDebug();
+    if (debug) drawDebug();
 }
