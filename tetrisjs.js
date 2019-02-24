@@ -7,6 +7,7 @@ const BH = RH-H; // buffer height
 const BS = 10; // block size in pixel
 const W2 = W*BS; // width of the board in pixel 
 const H2 = H*BS; // height of the board in pixel
+const SCALE = 2.0; // vertical and horizontal scaling
 const DASDELAY = 200; // delay after the first input is held, in ms
 const INPUTDELAY = 25; // delay between inputs when a key is held, in ms
 const GRAVITY = 500; // delay between the line falling, in ms
@@ -96,11 +97,19 @@ function spawnNextBlock() {
  *  RENDERING
  */
 
+function drawBorders() {
+    push();
+    noFill();
+    stroke(255,255,255);
+    strokeJoin(BEVEL);
+    rect(0, 0, W2+1, H2+1);
+    pop();
+}
 function drawBoard() {
     push();
-    translate((WIDTH-W2)/2, (HEIGHT-H2)/2);
     stroke(255, 255, 255, 25);
     noStroke();
+    translate(1, 1); // border
     for (let x=0; x<W; x++) {
         push();
         noStroke();
@@ -122,8 +131,7 @@ function drawBoard() {
 
 function drawBlock() {
     push();
-    translate((WIDTH-W2)/2, (HEIGHT-H2)/2);
-    stroke(255, 255, 255, 25);
+    translate(1, 1); // border
     noStroke();
     let color = data.colors[data[block.type].color-1];
     let shape = getShape(block.type, block.rot);
@@ -139,15 +147,6 @@ function drawBlock() {
             }
         }
     }
-    pop();
-}
-
-function drawBorders() {
-    push();
-    noFill();
-    stroke(255,255,255);
-    strokeJoin(BEVEL);
-    rect((WIDTH-W2)/2-1, (HEIGHT-H2)/2-1, W2+1, H2+1);
     pop();
 }
 
@@ -175,6 +174,22 @@ function drawGameOver() {
     pop();
 }
 
+function drawScore() {
+    push();
+    fill(255);
+    strokeWeight(2);
+    pop();
+}
+
+function drawNext() {
+    push();
+    stroke(255);
+    strokeWeight(1);
+    fill(55);
+    rect(0, 0, 10, 10);
+    pop();
+}
+
 function drawDebug() {
     push();
     fill(255, 255, 255);
@@ -185,13 +200,6 @@ function drawDebug() {
     textFont();
     text("hold = "+hold, 330, 400);
     text("resetCount = "+resetCount, 330, 425);
-    pop();
-}
-
-function drawScore() {
-    push();
-    fill(255);
-    strokeWeight(2);
     pop();
 }
 
@@ -331,23 +339,23 @@ function keyPressed() {
         hardDrop();
     }
     switch (key) {
-        case "p":
+        case "p": case "P":
             pause = !pause;
             break;
-        case "w":
+        case "w": case "W":
             let tmp = block.rot-1;
             if (tmp < 0) tmp = data[block.type].blocks.length-1;
             srsKickTest(false, block.rot, tmp);
             resetLockDelay();
             break;
-        case "x":
+        case "x": case "X":
             srsKickTest(true, block.rot, (block.rot+1)%4);
             resetLockDelay();
             break;
-        case "r":
+        case "r": case "R":
             initGame();
             break;
-        case "c":
+        case "c": case "C":
             swap();
             break;
     }
@@ -419,12 +427,15 @@ function setup() {
 
 function draw() {
     if (!pause && !gameOver) update();
-    translate(-(WIDTH/2),-(HEIGHT/2));
-    scale(2);
+    scale(SCALE);
     background(0);
+    push();
+    translate((WIDTH/2 - W2*SCALE/2) / SCALE, (HEIGHT/2 - H2*SCALE/2) / SCALE);
     drawBorders();
     drawBoard();
     drawBlock();
+    pop();
+    drawNext();
     if (pause) drawPause();
     if (gameOver) drawGameOver();
     drawDebug();
