@@ -172,15 +172,42 @@ function drawGameOver() {
 
 function drawScore() {
     push();
+    translate((WIDTH/2 - W2*SCALE/2) / SCALE + W2 + 10, (HEIGHT/2 - H2*SCALE/2) / SCALE + 110);
+    stroke(255);
+    strokeWeight(1);
+    fill(0);
+    rect(0, 0, 50, 50);
+    textSize(10);
+    strokeWeight(0);
     fill(255);
-    strokeWeight(2);
+    text("Score", 12, 10);
+    text(""+score, 5+20-textWidth(""+score)/2, 30);
     pop();
 }
 
 function drawNext() {
     push();
+    translate((WIDTH/2 - W2*SCALE/2) / SCALE + W2 + 10, (HEIGHT/2 - H2*SCALE/2) / SCALE);
     stroke(255);
     strokeWeight(1);
+    fill(0);
+    rect(0, 0, 50, 100);
+    for (let i = 0; i < 3; i++) {
+        noStroke();
+        let color = data.colors[data[queue[i]].color-1];
+        let shape = getShape(queue[i], 0);
+        let ox = 1, oy = 1+i*3;
+        let offset = queue[i] === "I" ? -(BS/2) : 0; 
+        let size = shape.length <= 3 ? shape.length : 3;
+        for (let x=0; x<shape.length; x++) {
+            for (let y=0; y<shape.length; y++) {
+                if (shape[y][x] >= 1) {
+                    fill(color[0], color[1], color[2]);
+                    if (oy+y>=0) rect((ox+x)*BS+offset, (oy+y)*BS+offset, BS, BS);
+                }
+            }
+        }
+    }
     pop();
 }
 
@@ -216,7 +243,6 @@ function lockAndCheck() {
     checkClear(block.y, block.y+4);
     spawnNextBlock();
     resetCount = 0;
-    console.log("yoyoy");
     landed = false;
     canSwap = true;
 }
@@ -435,6 +461,7 @@ function draw() {
     drawBlock();
     pop();
     drawNext();
+    drawScore();
     if (pause) drawPause();
     if (gameOver) drawGameOver();
     if (debug) drawDebug();
