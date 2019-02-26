@@ -68,6 +68,7 @@ function initGame() {
     landedTime = -1;
     inputHeldCount = 0;
     resetCount = 0;
+    score = 0;
     gameOver = false;
     landed = false;
     canSwap = true;
@@ -315,8 +316,7 @@ function checkClear() {
         }
         notCleared = false;
     }
-    if (linesCleared >= 1)
-        console.log(linesCleared);
+    score += getPoints(linesCleared, false);
     return linesCleared;
 }
 
@@ -332,6 +332,13 @@ function clearLine(y) {
     for (var x=0; x<W; x++) {
         board[x][y] = 0;
     }
+}
+
+function getPoints(linesCleared, tspin) {
+    let points = 0;
+    if (linesCleared <= 0 || linesCleared >= 5) return 0;
+    if (!tspin) points = data["scores"][linesCleared-1];
+    return points;
 }
 
 function resetLockDelay() {
