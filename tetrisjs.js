@@ -238,7 +238,32 @@ function drawNext() {
         let shape = getShape(queue[i], 0);
         let ox = 1, oy = 1+i*3;
         let offset = queue[i] === "I" ? -(BS/2) : 0; 
-        let size = shape.length <= 3 ? shape.length : 3;
+        //let size = shape.length <= 3 ? shape.length : 3;
+        for (let x=0; x<shape.length; x++) {
+            for (let y=0; y<shape.length; y++) {
+                if (shape[y][x] >= 1) {
+                    fill(color[0], color[1], color[2]);
+                    if (oy+y>=0) rect((ox+x)*BS+offset, (oy+y)*BS+offset, BS, BS);
+                }
+            }
+        }
+    }
+    pop();
+}
+
+function drawHold() {
+    push();
+    translate((WIDTH/2 - W2*SCALE/2) / SCALE - 60, (HEIGHT/2 - H2*SCALE/2) / SCALE);
+    stroke(255);
+    strokeWeight(1);
+    fill(0);
+    rect(0, 0, 50, 40);
+    noStroke();
+    if (hold != "") {
+        let color = data.colors[data[hold].color-1];
+        let shape = getShape(hold, 0);
+        let ox = 1, oy = 1;
+        let offset = hold === "I" ? -(BS/2) : 0; 
         for (let x=0; x<shape.length; x++) {
             for (let y=0; y<shape.length; y++) {
                 if (shape[y][x] >= 1) {
@@ -359,6 +384,7 @@ function hardDrop() {
 function checkClear() {
     let linesCleared = 0;
     let notCleared = false;
+    let spin = isTSpin();
     for (let y=0; y<H; y++) {
         for (let x=0; x<W; x++) {
             if (board[x][y+BH] === 0) {
@@ -373,7 +399,6 @@ function checkClear() {
         }
         notCleared = false;
     }
-    let spin = isTSpin();
     score += getPoints(linesCleared, spin);
     return linesCleared;
 }
@@ -410,7 +435,6 @@ function basicGravity(yMax) {
  */
 function isTSpin() {
     if (block.type != "T" || (lastRegisteredMove != MOVES.ROT && lastRegisteredMove != MOVES.ROTTST)) return SPINS.NO_SPIN;
-    console.log("hehe");
     let corners = [[0, 0], [0, 2], [2, 0], [2, 2]];
     let points = [[1, 0], [2, 1], [1, 2], [0, 1]];
     let behinds = [[1, 2], [0, 1], [1, 0], [2, 1]];
@@ -422,8 +446,8 @@ function isTSpin() {
     for (const corner of corners) {
         let x = block.x + corner[0];
         let y = block.y + corner[1];
-        if (x >= W || y >= RH || x < 0 || y < 0) continue;
-        if (board[x][y] >= 1) {
+        if (x >= W || x < 0 || y < 0) continue;
+        if (y >= RH || board[x][y] >= 1) {
             cornersBlocked++;
             if (point[0] == x || point[1] == y)
                 adjacentToPointBlocked++;
@@ -628,6 +652,7 @@ function draw() {
     drawBlock();
     pop();
     drawNext();
+    drawHold();
     drawScore();
     if (pause) drawPause();
     if (gameOver) drawGameOver();
