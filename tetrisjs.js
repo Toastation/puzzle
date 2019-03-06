@@ -221,6 +221,7 @@ function drawDebug() {
     text("hold = "+hold, 5, 50);
     text("resetCount = "+resetCount, 5, 65);
     text("landed = "+landed, 5, 80);
+    text("resets = "+resetCount, 5, 95);
     pop();
 }
 
@@ -265,12 +266,20 @@ function getGroundY() {
     return y;
 }
 
+function hasLanded() {
+    if (checkCollision(block.x, block.y+1, block.type, block.rot)) {
+        landed = true;
+        landedTime = millis();
+    } else {
+        landed = false;
+    }
+}
+
 function fall() {
     let ny = block.y+1;
     if (!checkCollision(block.x, ny, block.type, block.rot)) {
         block.y = ny;
-        landed = checkCollision(block.x, block.y+1, block.type, block.rot);
-        if (landed) landedTime = millis();
+        hasLanded();
     } else {
         if (block.y == SH) gameOver = true;
         landed = true;
@@ -292,7 +301,7 @@ function srsKickTest(clockwise, init, nrot) {
             block.x += tests[i][0];
             block.y += tests[i][1];
             block.rot = nrot;
-            landed = checkCollision(block.x, block.y+1, block.type, block.rot);
+            hasLanded();
             return true;
         }
     }
@@ -409,6 +418,7 @@ function input() {
             lastInput = t;
             inputHeldCount++;
             resetLockDelay();
+            hasLanded();
         }
     } else if (keyIsDown(LEFT_ARROW)) {
         if (!checkCollision(block.x-1, block.y, block.type, block.rot)) {
@@ -416,6 +426,7 @@ function input() {
             lastInput = t;
             inputHeldCount++;
             resetLockDelay();
+            hasLanded();
         }
     } else if (keyIsDown(DOWN_ARROW)) {
         fall();
@@ -427,7 +438,6 @@ function input() {
 
 function update() {
     input();
-
     let t = millis();
     if (landed && t - landedTime > LOCKDELAY)
         lockAndCheck();
