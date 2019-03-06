@@ -14,12 +14,32 @@ const GRAVITY = 500; // delay between the line falling, in ms
 const LOCKDELAY = 1000; // delay between the block landing and locking in place, in ms
 const MAXRESET = 10; // max number of lock delay reset with rotation/translation
 const TYPES = ["T", "O", "I", "S", "Z", "J", "L"];
+const MOVES = {
+    NONE : "NONE",
+    MOVEL : "MOVEL",
+    MOVER : "MOVER",
+    ROT : "ROT",
+    ROTTST : "ROTTST" 
+};
+const SPINS = {
+    NO_SPIN : "",
+    T_SPIN : "T-SPIN",
+    T_SPIN_MINI : "T-SPIN MINI"
+};
+const CLEAR = {
+    0 : "",
+    1 : "SINGLE",
+    2 : "DOUBLE",
+    3 : "TRIPLE",
+    4 : "TETRIS"
+}
 
 let data;
 let board;
 let fallInterval;
 let queue = [], queueBuffer = [];
 let hold = "";
+let lastRegisteredMove = MOVES.NONE;
 
 let lastFall = -1;
 let lastInput = -1;
@@ -41,6 +61,9 @@ let block = {
     rot : 0
 };
 
+/**
+ * Returns the block matrix of the given type and rotation
+ */
 function getShape(type, rot) {
     return data[type].blocks[rot];
 }
@@ -49,6 +72,9 @@ function getShape(type, rot) {
  * INIT
  */
 
+ /**
+  * Initializes the empty board
+  */
 function initBoard() {
     board = new Array(W);
     for (let w=0; w<W; w++) {
@@ -59,10 +85,14 @@ function initBoard() {
     }
 }
 
+/**
+ * Initializes the default parameters
+ */
 function initGame() {
     queue = [];
     queueBuffer = [];
     hold = "";
+    lastRegisteredMove = MOVES.NONE;
     lastFall = -1;
     lastInput = -1;
     landedTime = -1;
@@ -77,11 +107,19 @@ function initGame() {
     spawnNextBlock();
 }
 
+/**
+ * Initializes the block queue
+ */
 function initQueue() {
     queue = ["T", "O", "I", "S", "Z", "J", "L"];
     shuffle(queue, true);
 }
 
+/**
+ * Pops the head of the block queue and set it as the new block.
+ * Pops the head of the buffer and add it to the block queue.
+ * Refills and shuffles the buffer if it empty.
+ */
 function spawnNextBlock() {
     if (queueBuffer.length == 0) {
         queueBuffer = ["T", "O", "I", "S", "Z", "J", "L"];
@@ -93,6 +131,7 @@ function spawnNextBlock() {
     block.y = SH;
     block.type = nextType;
     block.rot = 0;
+    lastRegisteredMove = MOVES.NONE;
 }
 
 /**
@@ -222,13 +261,17 @@ function drawDebug() {
     text("resetCount = "+resetCount, 5, 65);
     text("landed = "+landed, 5, 80);
     text("resets = "+resetCount, 5, 95);
+    text("lastMove = "+lastRegisteredMove, 5, 110);
     pop();
 }
 
-/**
- * GAME LOGIC
- */
+/**************
+ * GAME LOGIC *
+ **************/
 
+/**
+ * Lock the block into the board 
+ */
 function lock() {
     let shape = getShape(block.type, block.rot);
     for (let x = 0; x<shape.length; x++) {
@@ -240,6 +283,9 @@ function lock() {
     return true;
 }
 
+/**
+ * Lock the block into the board and checks if lines can be cleared 
+ */
 function lockAndCheck() {
     lock();
     checkClear(block.y, block.y+4);
@@ -249,6 +295,9 @@ function lockAndCheck() {
     canSwap = true;
 }
 
+/**
+ * Returns true if the given block type, position and rotation are colliding with pieces on the board
+ */
 function checkCollision(ox, oy, type, rot) {
     let shape = getShape(type, rot);
     for (let x=0; x<shape.length; x++) {
@@ -260,12 +309,18 @@ function checkCollision(ox, oy, type, rot) {
     return false;
 }
 
+/**
+ * Returns the y coordinate of the block if we were to hard drop it (the projection on the ground)
+ */
 function getGroundY() {
     let y = block.y;
     while(!checkCollision(block.x, y+1, block.type, block.rot)) y += 1;
     return y;
 }
 
+/**
+ * Check if the block is on the ground, if so it changes the landed flag
+ */
 function hasLanded() {
     if (checkCollision(block.x, block.y+1, block.type, block.rot)) {
         landed = true;
@@ -275,6 +330,9 @@ function hasLanded() {
     }
 }
 
+/**
+ * Makes the block fall one line down if possible
+ */
 function fall() {
     let ny = block.y+1;
     if (!checkCollision(block.x, ny, block.type, block.rot)) {
@@ -287,27 +345,17 @@ function fall() {
     }
 }
 
+/**
+ * Makes the block fall instantly to the ground
+ */
 function hardDrop() {
     while(!checkCollision(block.x, block.y+1, block.type, block.rot)) block.y += 1;
     lockAndCheck();
 }
 
-function srsKickTest(clockwise, init, nrot) {
-    let rot = clockwise ? "cw" : "ccw";
-    let kick = block.type === "I" ? "kickI" : "kick";
-    let tests = data[kick][init][rot];
-    for (let i in tests) {
-        if (!checkCollision(block.x+tests[i][0], block.y+tests[i][1], block.type, nrot)) {
-            block.x += tests[i][0];
-            block.y += tests[i][1];
-            block.rot = nrot;
-            hasLanded();
-            return true;
-        }
-    }
-    return false;
-}
-
+/**
+ * Checks if some lines can be cleared and update the score
+ */
 function checkClear() {
     let linesCleared = 0;
     let notCleared = false;
@@ -325,10 +373,22 @@ function checkClear() {
         }
         notCleared = false;
     }
-    score += getPoints(linesCleared, false);
+    let spin = isTSpin();
+    score += getPoints(linesCleared, spin);
     return linesCleared;
 }
+ /**
+  * Clears the given line 
+  */
+function clearLine(y) {
+    for (var x=0; x<W; x++) {
+        board[x][y] = 0;
+    }
+}
 
+/**
+ * Makes all lines above yMax fall one line down 
+ */
 function basicGravity(yMax) {
     for (let y=yMax; y>0; y--) {
         for (let x=0; x<W; x++) {
@@ -337,19 +397,71 @@ function basicGravity(yMax) {
     }
 }
 
-function clearLine(y) {
-    for (var x=0; x<W; x++) {
-        board[x][y] = 0;
+/**
+ * Returns whether the last rotation was a (mini) T-spin or not
+ * T-spin rules :
+ *      is a T piece
+ *      last move was a rot
+ *      3 corners blocked
+ * T-spin mini rules :
+ *      empty block adjacent to the point
+ *      "behind" block blocked
+ *      not a mini if the twist was from a T-spin triple twist
+ */
+function isTSpin() {
+    if (block.type != "T" || (lastRegisteredMove != MOVES.ROT && lastRegisteredMove != MOVES.ROTTST)) return SPINS.NO_SPIN;
+    console.log("hehe");
+    let corners = [[0, 0], [0, 2], [2, 0], [2, 2]];
+    let points = [[1, 0], [2, 1], [1, 2], [0, 1]];
+    let behinds = [[1, 2], [0, 1], [1, 0], [2, 1]];
+    let cornersBlocked = 0;
+    let adjacentToPointBlocked = 0;
+    let point = points[block.rot];
+    let behind = behinds[block.rot];
+    let behindBlocked = false;
+    for (const corner of corners) {
+        let x = block.x + corner[0];
+        let y = block.y + corner[1];
+        if (x >= W || y >= RH || x < 0 || y < 0) continue;
+        if (board[x][y] >= 1) {
+            cornersBlocked++;
+            if (point[0] == x || point[1] == y)
+                adjacentToPointBlocked++;
+        }
     }
+    let x = block.x + behind[0], y = block.y + behind[1];
+    if (x >= 0 && x < H && y >= 0)
+        behindBlocked = board[x][y] >= 1 || y >= RH;
+    console.log("cornersBlocked = "+cornersBlocked);
+    console.log("adjacentToPointBlocked = "+adjacentToPointBlocked);
+    console.log("behindBlocked = "+behindBlocked);
+    console.log("--------------");
+    if (cornersBlocked >= 3) {
+        if (adjacentToPointBlocked === 1 || behindBlocked === true) {
+            if (lastRegisteredMove === MOVES.ROTTST) return SPINS.T_SPIN;
+            else return SPINS.T_SPIN_MINI;
+        }
+        return SPINS.T_SPIN;
+    }
+    return SPINS.NO_SPIN;
 }
 
-function getPoints(linesCleared, tspin) {
+/**
+ * Returns the amount of points from the last lines cleared
+ */
+function getPoints(linesCleared, spin) {
     let points = 0;
     if (linesCleared <= 0 || linesCleared >= 5) return 0;
-    if (!tspin) points = data["scores"][linesCleared-1];
+    if (spin === SPINS.NO_SPIN) points = data["scores"][linesCleared-1];
+    else if (spin === SPINS.T_SPIN_MINI) points = data["scores"][4+linesCleared];
+    else if (spin === SPINS.T_SPIN) points = data["scores"][6+linesCleared];
+    console.log(spin+" "+CLEAR[linesCleared])
     return points;
 }
 
+/**
+ * Resets the lock delay (from a rotation or move)
+ */
 function resetLockDelay() {
     if (landed) {
         if (resetCount < MAXRESET) {
@@ -359,6 +471,9 @@ function resetLockDelay() {
     }
 }
 
+/**
+ * Swaps the current blocks with the currently held block
+ */
 function swap() {
     if (!canSwap) return;
     let buf = block.type;
@@ -372,6 +487,30 @@ function swap() {
     canSwap = false;
 }
 
+/**
+ * Performs a rotation according to the SRS guideline
+ * Returns true if the rotation was successful 
+ */
+function srsKickTest(clockwise, init, nrot) {
+    let rot = clockwise ? "cw" : "ccw";
+    let kick = block.type === "I" ? "kickI" : "kick";
+    let tests = data[kick][init][rot];
+    for (let i in tests) {
+        if (!checkCollision(block.x+tests[i][0], block.y+tests[i][1], block.type, nrot)) {
+            lastRegisteredMove = block.type === "T" && rot === "cw" && (rot === 0 || rot === 2) && i === tests.length-1 ? MOVES.ROTTST : MOVES.ROT; // last kick of 0->1 or 2->3 is successful
+            block.x += tests[i][0];
+            block.y += tests[i][1];
+            block.rot = nrot;
+            hasLanded();
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * keyPressed function override
+ */
 function keyPressed() {
     if (!pause && !gameOver && keyCode == UP_ARROW) {
         hardDrop();
@@ -403,12 +542,18 @@ function keyPressed() {
     if (keyCode == DOWN_ARROW) return false;
 }
 
+/**
+ * keyReleased function override
+ */
 function keyReleased() {
     if (!pause && !gameOver)
         inputHeldCount = 0;
 }
 
-function input() {
+/**
+ * Handles movement inputs
+ */
+function movementInputs() {
     let t = millis();
     let inputDelay = (inputHeldCount === 1) ? DASDELAY : INPUTDELAY;
     if (lastInput > 0 && t - lastInput < inputDelay) return;
@@ -417,6 +562,7 @@ function input() {
             block.x += 1;
             lastInput = t;
             inputHeldCount++;
+            lastRegisteredMove = MOVES.MOVER;
             resetLockDelay();
             hasLanded();
         }
@@ -425,6 +571,7 @@ function input() {
             block.x -= 1;
             lastInput = t;
             inputHeldCount++;
+            lastRegisteredMove = MOVES.MOVEL;
             resetLockDelay();
             hasLanded();
         }
@@ -436,8 +583,11 @@ function input() {
     }
 }
 
+/**
+ * Updates the game (gravity, lock delay)
+ */
 function update() {
-    input();
+    movementInputs();
     let t = millis();
     if (landed && t - landedTime > LOCKDELAY)
         lockAndCheck();
@@ -449,7 +599,7 @@ function update() {
 }
 
 /**
- * PROCESSING
+ * PROCESSING FUNCTIONS
  */
 
 function preload() {
