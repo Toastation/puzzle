@@ -10,7 +10,9 @@ const H2 = H*BS; // height of the board in pixel
 const SCALE = 2.0; // vertical and horizontal scaling
 const DASDELAY = 200; // delay after the first input is held, in ms
 const INPUTDELAY = 25; // delay between inputs when a key is held, in ms
-const GRAVITY = 500; // delay between the line falling, in ms
+var gravity = 500; // delay between the line falling, in ms
+var gravityMax = 1000;
+var gravityMin = 1;
 const LOCKDELAY = 1000; // delay between the block landing and locking in place, in ms
 const MAXRESET = 10; // max number of lock delay reset with rotation/translation
 const TYPES = ["T", "O", "I", "S", "Z", "J", "L"];
@@ -53,6 +55,8 @@ let pause = false;
 let debug = true;
 let landed = false;
 let canSwap = true;
+
+let gui;
 
 let block = {
     x : 0,
@@ -616,7 +620,7 @@ function update() {
     if (landed && t - landedTime > LOCKDELAY)
         lockAndCheck();
     
-    if (t - lastFall > GRAVITY && !landed) { 
+    if (t - lastFall > gravity && !landed) { 
         fall();
         lastFall = t;
     }
@@ -639,6 +643,8 @@ function setup() {
     canvas.parent("sketch");
     initGame();
     lastFall = millis();
+    gui = createGui('Settings');
+    gui.addGlobals("gravity");
 }
 
 function draw() {
