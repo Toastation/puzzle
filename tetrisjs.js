@@ -8,18 +8,18 @@ const BS = 10; // block size in pixel
 const W2 = W*BS; // width of the board in pixel 
 const H2 = H*BS; // height of the board in pixel
 var scaling; // vertical and horizontal scaling
-var inputDelay; // delay between inputs when a key is held, in ms
-var das; // delay after the first input is held, in ms
+var ARR; // delay between inputs when a key is held, in ms
+var DAS; // delay after the first input is held, in ms
 var gravity; // delay between the line falling, in ms
 var lockDelay; // delay between the block landing and locking in place, in ms
 var maxReset; // max number of lock delay reset with rotation/translation
 var scalingMax = 3.0;
 var scalingMin = 1.0;
 var scalingStep = 0.2;
-var inputDelayMax = 100; 
-var inputDelayMin = 0; 
-var dasMax = 500;
-var dasMin = 0;
+var ARRMax = 100; 
+var ARRMin = 0; 
+var DASMax = 500;
+var DASMin = 0;
 var gravityMax = 1000;
 var gravityMin = 1;
 var lockDelayMax = 1000;
@@ -60,6 +60,9 @@ let inputHeldCount = 0;
 let landedTime = -1;
 let resetCount = 0;
 let score = 0;
+let totLinesCleared = 0;
+let timeCount = 0;
+let lastTime = 0;
 
 let gameOver = false;
 let pause = false;
@@ -92,8 +95,8 @@ function getShape(type, rot) {
  */
 function initParams() {
     scaling = 2.0; 
-    inputDelay = 25; 
-    das = 150; 
+    ARR = 25; 
+    DAS = 150; 
     gravity = 500; 
     lockDelay = 500;
     maxReset = 10; 
@@ -126,6 +129,9 @@ function initGame() {
     inputHeldCount = 0;
     resetCount = 0;
     score = 0;
+    totLinesCleared = 0;
+    timeCount = 0;
+    lastTime = millis();
     gameOver = false;
     landed = false;
     canSwap = true;
@@ -179,7 +185,7 @@ function drawBoard() {
     noFill();
     stroke(255,255,255);
     strokeJoin(BEVEL);
-    rect(0, 0, W2+1, H2+1);
+    rect(0, 0, W2+2, H2+2);
     noStroke();
     translate(1, 1); // border
     for (let x=0; x<W; x++) {
@@ -246,21 +252,6 @@ function drawGameOver() {
     pop();
 }
 
-function drawScore() {
-    push();
-    translate((WIDTH/2 - W2*scaling/2) / scaling + W2 + 10, (HEIGHT/2 - H2*scaling/2) / scaling + 110);
-    stroke(255);
-    strokeWeight(1);
-    fill(0);
-    rect(0, 0, 50, 50);
-    textSize(10);
-    strokeWeight(0);
-    fill(255);
-    text("Score", 12, 10);
-    text(""+score, 5+20-textWidth(""+score)/2, 30);
-    pop();
-}
-
 function drawNext() {
     push();
     translate((WIDTH/2 - W2*scaling/2) / scaling + W2 + 10, (HEIGHT/2 - H2*scaling/2) / scaling);
@@ -320,6 +311,25 @@ function drawHold() {
     pop();
 }
 
+function drawInfos() {
+    push();
+    translate((WIDTH/2 - W2*scaling/2) / scaling - 60, (HEIGHT/2 - H2*scaling/2) / scaling + 50);
+    stroke(255);
+    strokeWeight(1);
+    fill(0);
+    rect(0, 0, 50, 40);
+    strokeWeight(0);
+    textSize(8);
+    fill(255);
+    text("Score: "+score, 5+20-textWidth("Score: "+score)/2, 10);
+    text("Lines: "+totLinesCleared, 25-textWidth("Lines: "+totLinesCleared)/2, 20);
+    let min = round((Math.floor((timeCount/1000/60))));
+    let sec = round((Math.floor((timeCount/1000)%60)));
+    let mil = round(timeCount % 1000);
+    text(min+"\'"+sec+"\""+mil, 25-textWidth(min+"\'"+sec+"\""+mil)/2, 30);
+    pop();
+}
+
 function drawDebug() {
     push(); 
     fill(255, 255, 255);
@@ -327,7 +337,7 @@ function drawDebug() {
     stroke(0, 0, 0);
     textSize(10);
     text("hold = "+hold, 5, 50);
-    text("resetCount = "+resetCount, 5, 65);
+    text("landedTime = "+landedTime, 5, 65);
     text("landed = "+landed, 5, 80);
     text("resets = "+resetCount, 5, 95);
     text("lastMove = "+lastRegisteredMove, 5, 110);
@@ -357,7 +367,7 @@ function lock() {
  */
 function lockAndCheck() {
     lock();
-    checkClear(block.y, block.y+4);
+    totLinesCleared += checkClear(block.y, block.y+4);
     spawnNextBlock();
     resetCount = 0;
     landed = false;
@@ -393,7 +403,7 @@ function getGroundY() {
 function hasLanded() {
     if (checkCollision(block.x, block.y+1, block.type, block.rot)) {
         landed = true;
-        landedTime = millis();
+        if (resetCount < maxReset) landedTime = millis();
     } else {
         landed = false;
     }
@@ -410,7 +420,7 @@ function fall() {
     } else {
         if (block.y == SH) gameOver = true;
         landed = true;
-        landedTime = millis();
+        if (resetCount < maxReset) landedTime = millis();
     }
 }
 
@@ -581,6 +591,7 @@ function keyPressed() {
     switch (key) {
         case "p": case "P":
             pause = !pause;
+            lastTime = millis();
             break;
         case "w": case "W":
             let tmp = block.rot-1;
@@ -617,7 +628,7 @@ function keyReleased() {
  */
 function movementInputs() {
     let t = millis();
-    let delay = (inputHeldCount === 1) ? das : inputDelay;
+    let delay = (inputHeldCount === 1) ? DAS : ARR;
     if (lastInput > 0 && t - lastInput < delay) return;
     if (keyIsDown(RIGHT_ARROW)) {
         if (!checkCollision(block.x+1, block.y, block.type, block.rot)) {
@@ -653,11 +664,12 @@ function update() {
     let t = millis();
     if (landed && t - landedTime > lockDelay)
         lockAndCheck();
-    
     if (t - lastFall > gravity && !landed) { 
         fall();
         lastFall = t;
     }
+    timeCount += t - lastTime;
+    lastTime = t;
 }
 
 /**
@@ -678,27 +690,28 @@ function setup() {
     initGame();
     lastFall = millis();
     gui = createGui('Settings');
-    gui.addGlobals("scaling", "gravity", "das", "inputDelay", "lockDelay", "maxReset", "debug");
-    window.addEventListener("keydown", function(e) {
-        if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
-            e.preventDefault();
-        }
-    }, false);
+    gui.addGlobals("scaling", "gravity", "DAS", "ARR", "lockDelay", "maxReset", "debug");
+    window.addEventListener("keydown", function(e) { if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) e.preventDefault(); }, false);
 }
 
 function draw() {
-    if (!focused) pause = true;
+    if (!focused) {
+        pause = true;
+        lastTime = millis();
+    }
     if (!pause && !gameOver) update();
     drawBorder();
     scale(scaling);
+    // board
     push();
     translate((WIDTH/2 - W2*scaling/2) / scaling, (HEIGHT/2 - H2*scaling/2) / scaling);
     drawBoard();
     drawBlock();
     pop();
+    // infos 
     drawNext();
     drawHold();
-    drawScore();
+    drawInfos();
     if (pause) drawPause();
     if (gameOver) drawGameOver();
     if (debug) drawDebug();
