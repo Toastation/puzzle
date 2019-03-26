@@ -405,8 +405,8 @@ function getGroundY() {
  */
 function hasLanded() {
     if (checkCollision(block.x, block.y+1, block.type, block.rot)) {
-        landed = true;
         if (resetCount < maxReset) landedTime = millis();
+        landed = true;
     } else {
         landed = false;
     }
@@ -423,8 +423,8 @@ function fall() {
         hasLanded();
     } else {
         if (block.y == SH) gameOver = true;
+        if (resetCount < maxReset && !landed) landedTime = millis();
         landed = true;
-        if (resetCount < maxReset) landedTime = millis();
     }
 }
 
