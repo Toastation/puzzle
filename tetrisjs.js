@@ -63,6 +63,7 @@ let score = 0;
 let totLinesCleared = 0;
 let timeCount = 0;
 let lastTime = 0;
+let comboCounter = 0;
 
 let gameOver = false;
 let pause = false;
@@ -132,6 +133,7 @@ function initGame() {
     totLinesCleared = 0;
     timeCount = 0;
     lastTime = millis();
+    comboCounter = 0;
     gameOver = false;
     landed = false;
     canSwap = true;
@@ -341,6 +343,7 @@ function drawDebug() {
     text("landed = "+landed, 5, 80);
     text("resets = "+resetCount, 5, 95);
     text("lastMove = "+lastRegisteredMove, 5, 110);
+    text("comboCounter = "+comboCounter, 5, 125);
     pop();
 }
 
@@ -416,6 +419,7 @@ function fall() {
     let ny = block.y+1;
     if (!checkCollision(block.x, ny, block.type, block.rot)) {
         block.y = ny;
+        score += data["scores"][data["scores"].length-2];
         hasLanded();
     } else {
         if (block.y == SH) gameOver = true;
@@ -428,7 +432,9 @@ function fall() {
  * Makes the block fall instantly to the ground
  */
 function hardDrop() {
+    let startY = block.y;
     while(!checkCollision(block.x, block.y+1, block.type, block.rot)) block.y += 1;
+    score += (block.y - startY) * data["scores"][data["scores"].length-1];
     lockAndCheck();
 }
 
@@ -453,7 +459,9 @@ function checkClear() {
         }
         notCleared = false;
     }
-    score += getPoints(linesCleared, spin);
+    if (linesCleared == 0) comboCounter = 0;
+    else comboCounter++;
+    score +=  ((comboCounter > 1) ? comboCounter * data["scores"][11] : 1) * getPoints(linesCleared, spin);
     return linesCleared;
 }
  /**
@@ -528,7 +536,7 @@ function getPoints(linesCleared, spin) {
     if (spin === SPINS.NO_SPIN) points = data["scores"][linesCleared-1];
     else if (spin === SPINS.T_SPIN_MINI) points = data["scores"][4+linesCleared];
     else if (spin === SPINS.T_SPIN) points = data["scores"][6+linesCleared];
-    console.log(spin+" "+CLEAR[linesCleared])
+    console.log(spin+" "+CLEAR[linesCleared]);
     return points;
 }
 
