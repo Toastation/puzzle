@@ -162,21 +162,24 @@ function drawHold() {
  * Draw the score and time (info UI)
  */
 function drawInfos() {
+    let min = round((Math.floor((timeCount/1000/60))));
+    let sec = round((Math.floor((timeCount/1000)%60)));
+    let mil = round(timeCount % 1000);
+    let roundedPPS = Math.round(pps * 100) / 100;
     push();
     translate((WIDTH/2 - W2*scaling/2) / scaling - 60, (HEIGHT/2 - H2*scaling/2) / scaling + 50);
     stroke(255);
     strokeWeight(1);
     fill(0);
-    rect(0, 0, 50, 40);
+    rect(0, 0, 50, 50);
     strokeWeight(0);
     textSize(8);
     fill(255);
     text("Score: "+score, 5+20-textWidth("Score: "+score)/2, 10);
     text("Lines: "+totLinesCleared, 25-textWidth("Lines: "+totLinesCleared)/2, 20);
-    let min = round((Math.floor((timeCount/1000/60))));
-    let sec = round((Math.floor((timeCount/1000)%60)));
-    let mil = round(timeCount % 1000);
+    
     text(min+"\'"+sec+"\""+mil, 25-textWidth(min+"\'"+sec+"\""+mil)/2, 30);
+    text("PPS: "+roundedPPS, 25-textWidth("PPS: "+roundedPPS)/2, 40);
     pop();
 }
 
@@ -195,5 +198,6 @@ function drawDebug() {
     text("resets = "+resetCount, 5, 95);
     text("lastMove = "+lastRegisteredMove, 5, 110);
     text("comboCounter = "+comboCounter, 5, 125);
+    text("totalPieces = "+totalPieces, 5, 140);
     pop();
 }

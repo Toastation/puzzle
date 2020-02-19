@@ -7,6 +7,8 @@ const BH = RH-H; // buffer height
 const BS = 10; // block size in pixel
 const W2 = W*BS; // width of the board in pixel 
 const H2 = H*BS; // height of the board in pixel
+
+// PARAMETERS
 var scaling; // vertical and horizontal scaling
 var ARR; // delay between inputs when a key is held, in ms
 var DAS; // delay after the first input is held, in ms
@@ -25,6 +27,12 @@ var gravityMin = 1;
 var lockDelayMax = 1000;
 var maxResetMax = 15;
 var maxResetMin = 1;
+
+// STATS
+var totalPieces;
+var pps; // pieces per second
+var score = 0;
+var totLinesCleared = 0;
 
 const TYPES = ["T", "O", "I", "S", "Z", "J", "L"];
 const MOVES = {
@@ -59,8 +67,6 @@ let lastInput = -1;
 let inputHeldCount = 0;
 let landedTime = -1;
 let resetCount = 0;
-let score = 0;
-let totLinesCleared = 0;
 let timeCount = 0;
 let lastTime = 0;
 let comboCounter = 0;
@@ -99,6 +105,16 @@ function initParams() {
     maxReset = 10; 
 }
 
+/**
+ * Initializes the current game's stats
+ */
+function initStats() {
+    totalPieces = 0;
+    pps = 0;
+    score = 0;
+    totLinesCleared = 0;
+}
+
  /**
   * Initializes the empty board
   */
@@ -125,8 +141,6 @@ function initGame() {
     landedTime = -1;
     inputHeldCount = 0;
     resetCount = 0;
-    score = 0;
-    totLinesCleared = 0;
     timeCount = 0;
     lastTime = millis();
     comboCounter = 0;
@@ -134,6 +148,7 @@ function initGame() {
     landed = false;
     canSwap = true;
     initParams();
+    initStats();
     initBoard();
     initQueue();
     spawnNextBlock();
@@ -190,6 +205,7 @@ function lockAndCheck() {
     resetCount = 0;
     landed = false;
     canSwap = true;
+    totalPieces += 1;
 }
 
 /**
@@ -404,6 +420,11 @@ function srsKickTest(clockwise, init, nrot) {
     return false;
 }
 
+function updateStats() {
+    if (timeCount == 0) pps = 0;
+    else pps = (totalPieces / timeCount) * 1000;
+}
+
 /**
  * Updates the game (gravity, lock delay)
  */
@@ -418,6 +439,7 @@ function update() {
     }
     timeCount += t - lastTime;
     lastTime = t;
+    updateStats();
 }
 
 /**
@@ -425,7 +447,7 @@ function update() {
  */
 
 function preload() {
-    data = loadJSON("data.json", ()=>{
+    data = loadJSON("data.json", () => {
         console.log("data successfully loaded");
     }, ()=>{
         console.err("cannot load data");
@@ -439,7 +461,7 @@ function setup() {
     lastFall = millis();
     gui = createGui('Settings');
     gui.addGlobals("scaling", "gravity", "DAS", "ARR", "lockDelay", "maxReset", "debug");
-    window.addEventListener("keydown", function(e) { if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) e.preventDefault(); }, false);
+    window.addEventListener("keydown", function(e) { if ([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) e.preventDefault(); }, false);
 }
 
 function draw() {
